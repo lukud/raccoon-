@@ -4,8 +4,14 @@
 
 ### What does raccoon do?
 
-Raccoon is a pipeline that is intended to deployed as the last step of a reference genome assembly ('polishing'). It takes as input the raw data used to assemble the reference, as well as the assembly. The reads used to perform variant calls of single nucleotide variants (SNV) and short (<7bp) insertions and deletions (indels). After hard filtering, the called variants are integrated into the reference and the raw data is remaped onto the modifed assembly. Decreases in observed read depths of full length matching reads in regions were a variant was integrated are used to discard wrongly called variants. Error correction of reference assemblies is currently particularly important for regions where PacBio data has been used, as these contain an elevated amount of indels, even after self correction. 
-Racoon is implemented to drive and 
+Raccoon is an automated pipeline that is intended to be deployed as the last step of a reference genome assembly in order to correct base substitutions and small indels ('polishing'). It takes as input the raw data used to assemble the reference, as well as the assembly. The reads used to perform variant calls of single nucleotide variants and short (<7bp) indels. After hard filtering, the called variants are integrated into the reference and the raw data is remapped onto the modifed assembly. Decreases in observed read depths of full length matching reads in regions were a variant has been integrated are used as a criterium to reject wronlgy performed error corrections. Polishing reference assemblies is currently particularly important for regions where PacBio data has been used, as these contain an elevated amount of indels even after self correction with quiver. 
+
+### More detail..
+
+Raccoon is implemeted as a driver that executes or automatically submit to a distributed cluster one of the 12+1 stages needed to polish. 
+![alt tag](./pics/raccoon-scheme.png)
+
+
 This algorythm has been described by 
 
 ### Instalation
