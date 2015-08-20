@@ -92,7 +92,7 @@ The protocol file is an xml file setting various paramteres and paths. The follo
     <threads>NUMBER OF THREADS</threads>
     <cluster>
       <nJobs>NUMBER OF JOBS</nJobs>
-      <template>your-cluster-scheduler -n "</template>
+      <template>your-cluster-scheduler -n ${JOBNAME} -standard_error ${STDERR} -standard_output ${STDOUT} -command "${CMD}"</template>
     </cluster>
     <paths>
       <scripts>/racoon/basedir</scripts>
@@ -113,6 +113,13 @@ The `<outputDir>` tag points to the base directory where the output will be stor
 The `<input baseDir='x'>` points to the base directory (x) were your read files are stored. It contains further nested tags: `<p1>` and `<p2>` point to the actual readfiles. If `<p2>` is ommited, the input is treated as single end. The `<nPairs>` contains the number of read pairs (or reads, if run with single end data). This information is necessary to know how big the chunks for scattered stages will be. 
 The `<ploidy>` tag denotes the ploidy of your genome.
 ##### Cluster template tags
-In order to take care of automatic cluster submission, raccoon needs to know to submit to you cluster. This is done via the `<cluster>` tag. It contains two nested tags: `<nJobs>` denotes how many parallel jobs should be submitted. `<template>`gives a template string for cluster submission, in which the variable `${JOBNAME}`, `${STDERR}`,  `${STDOUT}`, `${CMD}` will be replaced with the relevant values. The user must provide the template string around these values. For example: if your 
+In order to take care of automatic cluster submission, raccoon needs to know to submit to you cluster. This is done via the `<cluster>` tag. It contains two nested tags: `<nJobs>` denotes how many parallel jobs should be submitted. `<template>`gives a template string for cluster submission, in which the variable `${JOBNAME}`, `${STDERR}`,  `${STDOUT}`, `${CMD}` will be replaced with the relevant values. The user must provide the template string around these values. For example: if your cluster is running torque, the content of your template tag should look like this:
+`<template>qsub -N ${JOBNAME} -e ${STDERR} -o ${STDOUT} -ADDITIONAL PARAMETERS ${CMD}</template>`
+The specific string depends on your system.
+##### Paths to resources
+raccoon depends on several programs internally. While most of them are likely to be standard isntallations on systems within genomic research institutes, their default version migth not be the required ones. In order to overcome this problem easily, the direct path to the executable, jar or folder can be provided in the protocol. The valid tags are `<scripts>` (to point to raccoons base directory, `<bwa>`, `<samtools>`, `<picardtools>`, `<gatk>`, `<python3>`, `<java>`
+
+
+
 
 
