@@ -26,16 +26,16 @@ Raccoon is implemeted as a driver with accessory scripts, that executes or autom
 ![alt tag](./pics/raccoon-scheme.png)
 
 
-The basic algorithm upon which raccoon is based has first been described by Otto et al., 2010 (http://www.ncbi.nlm.nih.gov/pubmed/20562415). However, its current implementation (iCORN2, available at http://icorn.sourceforge.net) fails to scale for genomes beyond 300-400Mb, a limitation that we seek to overcome with raccoon.
+The basic algorithm upon which raccoon is based has first been described by [Otto et al., 2010](http://www.ncbi.nlm.nih.gov/pubmed/20562415). However, its current implementation ([iCORN2](http://icorn.sourceforge.net)) fails to scale for genomes beyond 300-400Mb, a limitation that we seek to overcome with raccoon.
 
 ### Instalation
 
 Racoon is written in python 3 (tested with version 3.4). It currently depends on the follwing external programs (parenthesis denote the version used in development. This are the versions you should use, any other ones are not guaranteed to work):
 
 - [samtools (v1.2)](http://www.htslib.org/download/)
-- bwa (v0.7.8)
-- picardtools (v.1.136)
-- gatk (v3.4)
+- [bwa (v0.7.8)](http://sourceforge.net/projects/bio-bwa/files/)
+- [picardtools (v.1.136)](http://broadinstitute.github.io/picard/)
+- [gatk (v3.4)](https://www.broadinstitute.org/gatk/download/)
 
 Furthermore, the follwing non-default python3 modules are required:
 
