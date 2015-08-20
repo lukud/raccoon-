@@ -11,7 +11,7 @@ Polishing reference assemblies is currently particularly important for regions w
 
 Raccoon is implemeted as a driver with accessory scripts, that executes or automatically submits to a distributed cluster. One pass of error corrections is comprised of 12 stages, with one additionall setup stage that only needs to be executed once. Wherever possible, the stages have been parallelized via a scatter-gather approach to make error corrections of large genomes feasible. Each stage automatically executes the follwing one until it hits a scattered stage. These scattered stages are highlited in yellow in the follwing schmee. The user only needs to execute stages follwing a scattered stage.
 
-![alt tag](./pics/ECDriver-scheme.png)
+![alt tag](./pics/raccoon-scheme.png)
 
 
 This algorythm has been described by 
