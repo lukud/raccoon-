@@ -32,15 +32,15 @@ The basic algorithm upon which raccoon is based has first been described by [Ott
 
 Racoon is written in python 3 (tested with version 3.4). It currently depends on the follwing external programs (parenthesis denote the version used in development. This are the versions you should use, any other ones are not guaranteed to work):
 
-- [samtools (v1.2)](http://www.htslib.org/download/)
-- [bwa (v0.7.8)](http://sourceforge.net/projects/bio-bwa/files/)
-- [picardtools (v.1.136)](http://broadinstitute.github.io/picard/)
-- [gatk (v3.4)](https://www.broadinstitute.org/gatk/download/)
+  - [samtools (v1.2)](http://www.htslib.org/download/)
+  - [bwa (v0.7.8)](http://sourceforge.net/projects/bio-bwa/files/)
+  - [picardtools (v.1.136)](http://broadinstitute.github.io/picard/)
+  - [gatk (v3.4)](https://www.broadinstitute.org/gatk/download/)
 
 Furthermore, the follwing non-default python3 modules are required:
 
-- [pysam (v.0.8.3)](https://pypi.python.org/pypi/pysam)
-- [pyvcf (v.0.6.7)](https://pypi.python.org/pypi/PyVCF)
+  - [pysam (v.0.8.3)](https://pypi.python.org/pypi/pysam)
+  - [pyvcf (v.0.6.7)](https://pypi.python.org/pypi/PyVCF)
 
 For the actual pipeline, there is currently no installation process. Just download the folder and export it to you `$PATH` like so:
 ```
@@ -55,20 +55,26 @@ The pipeline is run through the driver like so:
 raccoon stage protocol
 ```
 The stage argument is one of the follwing 12:
-- setup
-- index
-- *map*
-- merge
-- prepvarcall
-- *varcall*
-- varintegration
-- reindex
-- *remap*
-- remerge
-- correction
+  - setup
+  - index
+  - **map**
+  - merge
+  - prepvarcall
+  - **varcall**
+  - varintegration
+  - reindex
+  - **remap**
+  - remerge
+  - correction
 
-The setup stage only needs to be run once at the very beginning. The remaining stages can be run iteratively, raccoon will automatically take care of rewiring the input for each iteration. By default, each stage will automatically call the following stages once it finishes, until a scattered stage is reacher (denoted in bold letters above). This means that calling index will automatically call index and map. Calling map will call merge will call merge, prepvarcall and varcall. Calling varintegration will call varintegration, reindex and remap. Calling remerge will call remerge, correction and subsequently index and map for *the following iteration*. If you want to call each stage manually for some reasone (e.g. an intermediate stage failed), this can be done by invocing the -p argument, like so:
+The setup stage only needs to be run once at the very beginning. The remaining stages can be run iteratively, and raccoon will automatically take care of rewiring the input for each iteration. 
+By default, each stage (except setup) will automatically call the following stages once it finishes, until a scattered stage is reached (denoted in bold letters above). This means that calling index will automatically call index and map. Calling map will call call merge, prepvarcall and varcall. Calling varintegration will call varintegration, reindex and remap. Calling remerge will call remerge, correction and subsequently index and map for **the following iteration**. If you want to call each stage manually for some reasone (e.g. an intermediate stage failed), this can be done by invoking the -p argument, like so:
 ```
 raccoon stage protocol -p
 ```
+
+### The protocol file
+
+The protocol file is an xml file setting various paramteres and paths. The `<ec_pipeline>` tags delimit the protocol. 
+
 
