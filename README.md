@@ -9,7 +9,7 @@ Raccoon is an automated pipeline that is intended to be deployed as the last ste
 ### More detail..
 
 Raccoon is implemeted as a driver that executes or automatically submit to a distributed cluster one of the 12+1 stages needed to polish. 
-![alt tag](./pics/raccoon-scheme.png)
+![alt tag](./pics/ECDriver-scheme.png)
 
 
 This algorythm has been described by 
