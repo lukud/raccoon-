@@ -47,6 +47,7 @@ For the actual pipeline, there is currently no installation process. Just downlo
 cd /path/to/raccoon
 export PATH=$PATH:$(pwd)
 ```
+For now, it is essential that the `raccoon` program remains within this folder, as its modules can otherwise not be accessed. 
 
 ### Running raccoon
 
@@ -75,6 +76,39 @@ raccoon stage protocol -p
 
 ### The protocol file
 
-The protocol file is an xml file setting various paramteres and paths. The `<ec_pipeline>` tags delimit the protocol. 
+The protocol file is an xml file setting various paramteres and paths. the follwing isa template protocol to explain what is going on and needd
+
+```
+<ec_pipeline>
+    <reference>/path/to/reference.fa</reference>
+    <outputDir>/path/to/output/basedir/</outputDir>
+    <input baseDir='/path/to/input/basedir'>
+        <p1>readFile.pair1.fastq</p1>i
+        <p2>readFile.pair2.fastq</p2>
+        <nPairs>NUMBER OF READS/READ-PAIRS</nPairs>
+    </input>
+    <ploidy>PLOIDY</ploidy>
+    <threads>NUMBER OF THREADS</threads>
+    <cluster>
+      <nJobs>NUMBER OF JOBS</nJobs>
+      <template>your-cluster-scheduler -n ${JOBNAME} -standard_error ${STDERR} -standard_output ${STDOUT} -command "${CMD}"</template>
+    </cluster>
+    <paths>
+      <scripts>/racoon/basedir</scripts>
+      <bwa>/path/to/bwa</bwa>
+      <samtools>/path/to/samtools</samtools>
+      <picardtools>/path/to/picard.jar</picardtools>
+      <gatk>/path/to/GenomeAnalysisTK.jar</gatk>
+      <python3>/path/to/python3</python3>
+      <java>/path/to/java</java>
+    </paths>
+</ec_pipeline>
+```
+
+The `<ec_pipeline>` tags delimit the protocol. 
+The `<reference>` tag points to the reference assembly to be corrected.
+The `<outputDir>` tag points to the base directory where the output will be stored.
+The `<input baseDir=''>` points to the base directory were your read files are stored. It contains further nested tags:
+
 
 
