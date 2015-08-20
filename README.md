@@ -3,13 +3,15 @@
 ***THIS IS AN EARLY AND BUGGY ALPHA RELEASE NOT INTENDED FOR DISTRIBUTION!***
 
 
-### Known bugs and ToDos:
+### Known bugs and To-Dos:
 - Number of jobs in cluster submission may not be smaller then number of scaffolds in the assembly
 - Neither number of jobs nor number scaffolds may be one
+- Needs to be able to parse various lanes/readfiles in same protocol
 - Need to organize all output of each stage in folders (it's rather messy right now)
 - Organize module structure and separate from driver
 - Need's a lot more input validation
 - A deamon to automate submission of scattered stages would be nice
+- do a dedup stage in first pass and extract reads from that for the follwing one?
 
 
 ### What does raccoon do?
