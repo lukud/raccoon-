@@ -6,6 +6,7 @@
 ### Known bugs and To-Dos:
 - Number of jobs in cluster submission may not be smaller then number of scaffolds in the assembly
 - Neither number of jobs nor number scaffolds may be one
+- Deal with multiple lanes at once, so there's no need cor concatenation
 - Needs to be able to parse various lanes/readfiles in same protocol
 - Need to organize all output of each stage in folders (it's rather messy right now)
 - Organize module structure and separate from driver
@@ -76,7 +77,7 @@ raccoon stage protocol -p
 
 ### The protocol file
 
-The protocol file is an xml file setting various paramteres and paths. the follwing isa template protocol to explain what is going on and needd
+The protocol file is an xml file setting various paramteres and paths. The following shows a template protocol and explains the individual tags. All uppercase content are integers
 
 ```
 <ec_pipeline>
@@ -91,7 +92,7 @@ The protocol file is an xml file setting various paramteres and paths. the follw
     <threads>NUMBER OF THREADS</threads>
     <cluster>
       <nJobs>NUMBER OF JOBS</nJobs>
-      <template>your-cluster-scheduler -n ${JOBNAME} -standard_error ${STDERR} -standard_output ${STDOUT} -command "${CMD}"</template>
+      <template>your-cluster-scheduler -n "</template>
     </cluster>
     <paths>
       <scripts>/racoon/basedir</scripts>
@@ -104,11 +105,14 @@ The protocol file is an xml file setting various paramteres and paths. the follw
     </paths>
 </ec_pipeline>
 ```
-
-The `<ec_pipeline>` tags delimit the protocol. 
+#### The tags 
+The `<ec_pipeline>` tags delimit the protocol.
+##### Input tags 
 The `<reference>` tag points to the reference assembly to be corrected.
 The `<outputDir>` tag points to the base directory where the output will be stored.
-The `<input baseDir=''>` points to the base directory were your read files are stored. It contains further nested tags:
-
+The `<input baseDir='x'>` points to the base directory (x) were your read files are stored. It contains further nested tags: `<p1>` and `<p2>` point to the actual readfiles. If `<p2>` is ommited, the input is treated as single end. The `<nPairs>` contains the number of read pairs (or reads, if run with single end data). This information is necessary to know how big the chunks for scattered stages will be. 
+The `<ploidy>` tag denotes the ploidy of your genome.
+##### Cluster template tags
+In order to take care of automatic cluster submission, raccoon needs to know to submit to you cluster. This is done via the `<cluster>` tag. It contains two nested tags: `<nJobs>` denotes how many parallel jobs should be submitted. `<template>`gives a template string for cluster submission, in which the variable `${JOBNAME}`, `${STDERR}`,  `${STDOUT}`, `${CMD}` will be replaced with the relevant values. The user must provide the template string around these values. For example: if your 
 
 
