@@ -117,7 +117,11 @@ In order to take care of automatic cluster submission, raccoon needs to know to 
 `<template>qsub -N ${JOBNAME} -e ${STDERR} -o ${STDOUT} -ADDITIONAL PARAMETERS ${CMD}</template>`
 The specific string depends on your system.
 ##### Paths to resources
-raccoon depends on several programs internally. While most of them are likely to be standard isntallations on systems within genomic research institutes, their default version migth not be the required ones. In order to overcome this problem easily, the direct path to the executable, jar or folder can be provided in the protocol. The valid tags are `<scripts>` (to point to raccoons base directory, `<bwa>`, `<samtools>`, `<picardtools>`, `<gatk>`, `<python3>`, `<java>`
+raccoon depends on several programs internally. While most of them are likely to be standard isntallations on systems within genomic research institutes, their default version migth not be the required ones. In order to overcome this problem easily, the direct path to the executable, jar or folder can be provided in the protocol. The valid tags are `<scripts>` (to point to raccoons base directory), `<bwa>`, `<samtools>`, `<picardtools>`, `<gatk>`, `<python3>` and `<java>`.
+
+#### Output files.
+
+I didn't write this section yet, because it will change as soon as i tidy some things up. The important part for now is: A basedirectory will be created. It will contain a folder called `READS` containing the output of the setup stage (chunked up readfiles for parallelisation) as well as one folder for each iteration raccoon performs. The error corrected assembly is called reference.sanitizedVariants.fa
 
 
 
