@@ -44,6 +44,7 @@ Furthermore, the follwing non-default python3 modules are required:
 
 For the actual pipeline, there is currently no installation process. Just donwload the folder and export it to you `$PATH` like so:
 
-`cd /path/to/raccoon; export PATH=$PATH:$(pwd)`
+`cd /path/to/raccoon
+export PATH=$PATH:$(pwd)`
 
 
