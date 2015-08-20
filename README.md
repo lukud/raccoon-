@@ -1,6 +1,16 @@
-# raccoon - A scalable reference assembly error correction pipeline
+# raccoon - A Scalable Reference Assembly Error Correction Pipeline
 
 ***THIS IS AN EARLY AND BUGGY ALPHA RELEASE NOT INTENDED FOR DISTRIBUTION!***
+
+
+### Known bugs and ToDos:
+- Number of jobs in cluster submission may not be smaller then number of scaffolds in the assembly
+- Neither number of jobs nor number scaffolds may be one
+- Need to organize all output of each stage in folders (it's rather messy right now)
+- Organize module structure and separate from driver
+- Need's a lot more input validation
+- A deamon to automate submission of scattered stages would be nice
+
 
 ### What does raccoon do?
 
@@ -14,7 +24,7 @@ Raccoon is implemeted as a driver with accessory scripts, that executes or autom
 ![alt tag](./pics/raccoon-scheme.png)
 
 
-This algorythm has been described by 
+The basic algorithm upon which raccoon is based has first been described by Otto et al., 2010 (http://www.ncbi.nlm.nih.gov/pubmed/20562415). However, its current implementation (iCORN2, available at http://icorn.sourceforge.net) fails to scale for genomes beyond 300-400Mb, a limitation that we seek to overcome with raccoon.
 
 ### Instalation
 
