@@ -15,22 +15,29 @@ class SanitizeVariants(object):
     '''
     
     def __init__(self, bam, reference, varTrack, outfilePrefix):
+
+        input_length=0        
         self.outputScaffolds=set()
-        
-        input_length=0
         self.outfilePrefix=outfilePrefix
+        self.varTrack=varTrack
+
         #parse fasta into dict of seqrecords:
-        self.sequences=dict()
+        self.sequences=dict()        
         logging.info('loading in reference')
         for Sequence in load_fasta(reference):
             self.sequences[Sequence.identifier]=Sequence
             input_length+=len(Sequence.sequence)
-        self.Alignments=pysam.AlignmentFile(bam, 'rb')
-        self.varTrack=open(varTrack,'r')
+        
         self.varSanitiation=open(os.path.join(outfilePrefix, 'reference.sanitizedVariants.fa'),'w')
-        #run the whole thing
-        self.sanitize_variants()
-        self.Alignments.close()
+        
+        #check if we've got any variants to integrate, if so run it
+        if os.path.getsize(self.varTrack) > 0:
+            self.varTrack=open(varTrack,'r')
+            self.Alignments=pysam.AlignmentFile(bam, 'rb')
+            self.sanitize_variants()
+            self.Alignments.close()
+            self.varTrack.close()
+        
         #output scaffolds on which no corrections have been made
         for sequence in self.sequences:
             if sequence not in self.outputScaffolds:
@@ -98,7 +105,7 @@ class SanitizeVariants(object):
 if __name__ == '__main__':
     
     logFormat = "%(asctime)s [%(levelname)s] %(message)s"
-    logging.basicConfig( stream=sys.stderr, format=logFormat)
+    logging.basicConfig(stream=sys.stderr, format=logFormat)
     
     #parse arguments
     parser = argparse.ArgumentParser()
@@ -110,8 +117,5 @@ if __name__ == '__main__':
                         choices=['info','WARNING','ERROR', 'DEBUG'], default='info')
     args=parser.parse_args()
     logging.basicConfig( stream=sys.stderr, format=logFormat, level=args.verbosity)
-    import time
-    start_time = time.time()
 
     i=SanitizeVariants(args.alignments, args.reference, args.vartrack, args.outfilePrefix)
-    print("--- %s seconds ---" % (time.time() - start_time))

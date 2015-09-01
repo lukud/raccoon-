@@ -9,6 +9,7 @@ from ECUtils import *
 import argparse
 import pysam
 from collections import defaultdict
+from collections import Counter
 
 class SNVFilter(vcf.filters.Base):
     '''
@@ -74,6 +75,7 @@ class IntegrateTrackVariants(object):
         self.statTracker=defaultdict(int)
         self.varTrack=open(os.path.join(outPrefix,\
                                         'varTrack.tsv'),'w')
+        self.statCounter=Counter()
 
         #load reference
         logging.info("Loading reference")        
@@ -89,13 +91,16 @@ class IntegrateTrackVariants(object):
                                               'reference.varcall.integrated.fa'),'w')
         
         for vcfFile in self.variantFiles.split(","):
-            modScaffs=self.integrate_variants(vcfFile)
+            modScaffs, stats=self.integrate_variants(vcfFile)
             self.outTracker=self.outTracker.union(modScaffs)
+            self.statCounter+=stats
 
         for sequence in self.sequenceDict:
             if sequence not in self.outTracker:
                 self.varIntegration.write(self.sequenceDict[sequence]\
                                           .get_fasta_string())
+        for i in self.statCounter:
+            print("{}\t{}".format(i,self.statCounter[i]), file=sys.stderr)
     
     def integrate_variants(self, vcfFile):
         '''
@@ -204,22 +209,28 @@ class IntegrateTrackVariants(object):
                                                 Record.REF, coverage))
             
         #get sequence from last var untill end of sequence
-        modSequence+=self.sequenceDict[Record.CHROM].\
-                    sequence[refSliceStart:]
+        #try-except to catch exception that occurs if no variants were called
+        try:
+            modSequence+=self.sequenceDict[Record.CHROM].\
+                        sequence[refSliceStart:]
+        except UnboundLocalError:
+            logging.warning('Looks like no variants have been called!')
+
         #output last scaffold:
         if modSequence:
             Seq=DNASequence(identifier, modSequence)
             self.varIntegration.write(Seq.get_fasta_string())
             outputScaff.add(identifier)
 
-
-        print("INTEGRATED SNV :\t{}".format(integratedSNV))
-        print("INTEGRATED INDELS:\t{}".format(integratedIndel))
-        print('UNCOVERED VARS:\t{}'.format(nonCovered))
-        print('FILTERED VARS:\t{}'.format(filtered))
-        print('ASSEMBLY LEGNTH: {}'.format(len(modSequence)))
+        stats=Counter()
         
-        return outputScaff
+        stats["INTEGRATED SNV"]=integratedSNV
+        stats["INTEGRATED INDELS"]=integratedIndel
+        stats["UNCOVERED VARS"]=nonCovered
+        stats["FILTERED VARS"]=filtered
+        stats["ASSEMBLY LENGTH"]=len(modSequence)
+        
+        return outputScaff, stats
 
     
 if __name__ == '__main__':
