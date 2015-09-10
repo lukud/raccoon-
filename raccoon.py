@@ -15,6 +15,7 @@ import argparse
 import string
 import glob
 import traceback
+import random
 
 
 class Protocol(object):
@@ -56,6 +57,7 @@ class Protocol(object):
         Pair1=InBaseDir.find('p1')
         Pair2=InBaseDir.find('p2')
         NPairs=InBaseDir.find('nPairs')
+        deduplicate=InBaseDir.find('deduplicate')
         
         if Pair1 is None:
             logging.critical('Read file not correctly provided in protocol at {}'.format(self.protocol))
@@ -67,7 +69,7 @@ class Protocol(object):
             self.pair2=os.path.join(self.inBaseDir,Pair2.text)
         if NPairs is None:
             logging.critical('Must provide number of read pairs in protocol at {}\n'\
-                         '\tEg: run cat yourReadFile.fq | grep \'^@\' | wc -l'.format(self.protocol))
+                             '\tEg: run cat yourReadFile.fq | grep \'^@\' | wc -l'.format(self.protocol))
             sys.exit(1)
             
         #self.pair1=os.path.join(self.inBaseDir,Pair1.text)
@@ -80,6 +82,21 @@ class Protocol(object):
         if absentPair:
             logging.critical('The provided readfile at {} does not exist'.format(absentPair))
             sys.exit(1)
+        
+        if deduplicate is not None:
+            if deduplicate.text=='true':
+                self.deduplicate=True
+            elif self.deduplicate=='false':
+                self.deduplicate==False
+            else:
+                logging.critical("The deduplicate tag may only have the values"\
+                                 "'true' or 'false'. The provided value is"\
+                                 "'{}'".format(deduplicate.text))
+        
+        else:
+            self.deduplicate=False
+            
+                
         ploidy=p.find('ploidy')
         if ploidy is None:
             logging.warn('No ploidy was provided in the protocol. Assuming a diploid sample!')
@@ -175,9 +192,44 @@ class StageDriver(object):
             
         self.baseDir=os.path.join(self.MyProtocol.outDir,\
                                   "ITERATION_{}".format(self.iteration))
+        if not os.path.exists(self.baseDir):
+            os.mkdir(self.baseDir)
         
-        stages=['setup', 'index', 'map', 'merge', 'prepvarcall', 'varcall', \
+        self.stages=['setup', 'index', 'map', 'merge', 'prepvarcall', 'varcall', \
                 'varintegration', 'reindex', 'remap', 'remerge', 'correction']
+        self.stage=stage
+        #try to get the next stage:
+        try:
+            self.nextStage=self.stages[self.stages.index(stage)+1]
+        except IndexError:
+            #if the stage is correction, the next one is index in next iter 
+            self.nextStage='index'
+        #try to get the previsprevious stage:
+        try:
+            previousStage=self.stages[self.stages.index(stage)-1]
+        except IndexError:
+            previousStage=None
+
+        #get/create the stage specific directory
+        if previousStage is not None:
+            self.previousStageDir=os.path.join(self.baseDir, previousStage)
+        self.stageDir=os.path.join(self.baseDir, stage)
+        #if stage is setup, set the thing outside of the nestings:
+        if stage=='setup':
+            self.stageDir=os.path.join(self.MyProtocol.outDir, 'setup')
+        #we're gonna need the path to the index directory sometimes:
+        self.indexDir=os.path.join(self.baseDir, 'index')
+        #create the directory for the current stage, put setup outside of nestings
+        if not os.path.exists(self.stageDir):
+            os.mkdir(self.stageDir)
+        #if the directory exists and is not empty, we're not touching it..
+        elif os.listdir(self.stageDir) != []:
+            logging.critical('Stage directory {} for iteration {} exists and '\
+                             'is not empty! Please check its contents and '\
+                             'delete them if necessary.'.format(self.stage, self.iteration))
+            logging.critical('Exiting...')
+            sys.exit(1)
+
         
         #run stage
         if stage=="setup":
@@ -202,24 +254,16 @@ class StageDriver(object):
             commands, wDir=self.varintegration(self.iteration, piped=self.piped)
         elif stage=="correction":
             commands, wDir=self.correction(self.iteration, piped=self.piped)
-        elif stage=="mapprep":
-            commands, wDir=self.mapprep(self.iteration, piped=self.piped)
         else:
-            logging.warning('Man..this error should really really not occur...')
             #because calls to non existing stages should be filtered by argparser
+            logging.warning('Man..this error should really really not occur...')
             sys.exit(1)
         
         #autocall next stage for unscattered stages
         if self.piped and wDir==None:
-            try:
-                nextStage=stages[stages.index(stage)+1]
-            except IndexError:
-                #if the stage is correction, the next one is index in next iter 
-                nextStage='index'
-            nextStageCmd=self.selfCall(nextStage)
-            commands=self.constructCommand(stage, commands+nextStageCmd)
-            wDir=self.baseDir
-            
+            nextStageCmd=self.selfCall(self.nextStage)
+            commands=self.constructCommand(self.stage, commands+nextStageCmd)
+            wDir=self.stageDir
         
         logging.debug("CommandRunner Returned: " + 
             str(self.runCmd(commands, wDir, self.stage )) )
@@ -237,18 +281,14 @@ class StageDriver(object):
         create job to check headers of reference and
         chunk up readfiles if necesary
         '''
-        readDir=os.path.join(self.MyProtocol.outDir,'READS')
+        #readDir=os.path.join(self.MyProtocol.outDir,'READS')
+        readDir=self.stageDir
         retCmd = list()
         
         setupScript=os.path.join(self.MyProtocol.scriptBase, \
                                      'ECsetup.py')
-        if not os.path.exists(readDir):
-            os.makedirs(readDir)
-        else:
-            logging.critical("Directory {} already exists. Please, don't touch "\
-                             "any of the folderstructures created and refrain "\
-                             "from storing any files within them!".format(readDir))
-            sys.exit(1)
+        logging.info('Calling setup script located at {}'.format(setupScript))
+
         cmd=string.Template('${ECSetupPath} ${reference} '\
                             '${pair1} ${pair2} ${outDir} ${nPairs}').\
         substitute({'ECSetupPath':  setupScript,\
@@ -273,23 +313,29 @@ class StageDriver(object):
         after varcall:  reference.varcall.integrated.fa
         after qc:       reference.varcall.PASS.fa
         '''
-
+        
         retCmd=list()
         #!!create sequence dict and fai !!
         if not reindex:
-            reference=os.path.join(self.baseDir,'reference.fa')
+            #reference=os.path.join(self.baseDir,'reference.fa')
+            reference=os.path.join(self.stageDir,'reference.fa')
             if iteration==1:
-                if not os.path.exists(self.baseDir):
-                    os.mkdir(self.baseDir)
+                # if not os.path.exists(self.baseDir):
+                #     os.mkdir(self.baseDir)
                 os.symlink(self.MyProtocol.reference, reference)
                 #build command
             elif iteration!=1:
-                lastPass=os.path.join(self.MyProtocol.outDir, \
-                                         'ITERATION_{}'.format(iteration-1),\
-                                         'reference.sanitizedVariants.fa')
+                lastPass=os.path.join(*[self.MyProtocol.outDir, \
+                                        'ITERATION_{}'.format(iteration-1),\
+                                        'correction',\
+                                         'reference.sanitizedVariants.fa'])
                 os.symlink(lastPass, reference)
         else:
-            reference=os.path.join(self.baseDir, 'reference.varcall.integrated.fa')
+            # reference=os.path.join(self.baseDir, 'reference.varcall.integrated.fa')
+            reference=os.path.join(self.previousStageDir, 'reference.varcall.integrated.fa')
+            varRef=os.path.join(self.stageDir, 'reference.varcall.integrated.fa')
+            os.symlink(reference, varRef)
+            reference=varRef
             
         if reference.endswith('fasta'):
             seqdict=reference.replace(".fasta", ".dict")
@@ -322,7 +368,7 @@ class StageDriver(object):
         stderr=os.path.join(self.baseDir, j+".err")
         retCmd.append(Command(cmd,j,stdout, stderr))            
         
-        return retCmd, self.baseDir
+        return retCmd, self.stageDir
             
         
     def mapping(self, iteration, remap=False):
@@ -330,22 +376,24 @@ class StageDriver(object):
         retCmd=list()
         if remap:
             outfileSuffix='_remap.bam'
-            reference=os.path.join(self.baseDir, 'reference.varcall.integrated.fa')
+            # reference=os.path.join(self.baseDir, 'reference.varcall.integrated.fa')
+            reference=os.path.join(self.previousStageDir, \
+                                   'reference.varcall.integrated.fa')
         else:
             outfileSuffix='_map.bam'
-            reference=os.path.join(self.baseDir,'reference.fa')
+            reference=os.path.join(self.previousStageDir,'reference.fa')
             
-        if not os.path.exists(self.baseDir):
-            os.mkdir(self.baseDir) 
+        # if not os.path.exists(self.baseDir):
+        #     os.mkdir(self.baseDir) 
         #build commands
-        cmdTemplate=string.Template("${bwa} mem -t ${threads} -R"\
+        cmdTemplate=string.Template("${bwa} mem -M -t ${threads} -R"\
                                     "'@RG\\tID:dummy\\tSM:dummy\\tLB:dummy' "\
                                     "${reference} ${pair1} ${pair2} |"\
                                     "${samtools} view -@ ${threads} -Shb - |"\
                                     "${samtools} sort -@ ${threads} -O bam "\
-                                    "-T tmpBam -o ${outfile} -;\n")
+                                    "-T ${tmpBam} -o ${outfile} -;\n")
         
-        readDir=os.path.join(self   .MyProtocol.outDir,'READS')
+        readDir=os.path.join(os.path.join(self.MyProtocol.outDir, 'setup'))
         pairNames=set()
         if not os.path.exists(readDir):
             logging.critical("Read directory does not exist. Did you run the setup stage?")
@@ -362,6 +410,9 @@ class StageDriver(object):
                 pair2=''
             else:
                 pair2=os.path.join(readDir,pairPrefix+'.p2.fq')
+            randString=''.join(random.choice(string.ascii_uppercase + string.digits)\
+                               for _ in range(6))
+
             cmd=cmdTemplate.substitute({'bwa':      self.MyProtocol.bwa,\
                                         'samtools': self.MyProtocol.samtools,\
                                         'threads':  self.MyProtocol.nThreads,\
@@ -369,19 +420,21 @@ class StageDriver(object):
                                         'pair1':    os.path.join(readDir,\
                                                                  pairPrefix\
                                                                  +'.p1.fq'),
-                                        'pair2':    pair2,
-                                        'outfile':  os.path.join(self.baseDir,\
+                                        'pair2':    pair2,\
+                                        'tmpBam':   os.path.join(self.stageDir,
+                                                                  randString),
+                                        'outfile':  os.path.join(self.stageDir,\
                                                                  pairPrefix+\
                                                                  outfileSuffix)})
             j='remap' if remap else 'map'
             jobname=j
-            stdout=os.path.join(self.baseDir, j+'.out')
-            stderr=os.path.join(self.baseDir, j+'.err')
+            stdout=os.path.join(self.stageDir, j+'.out')
+            stderr=os.path.join(self.stageDir, j+'.err')
             logging.debug('Executing {}'.format(cmd))
             Command(cmd, jobname, stdout, stderr)
             retCmd.append(Command(cmd, j, stdout, stderr))
         
-        return retCmd, self.baseDir
+        return retCmd, self.stageDir
     
     def merge_bam(self, iteration, remerge=False, piped=False):
         '''
@@ -392,46 +445,96 @@ class StageDriver(object):
         '''
         retCmd=list()
         if not remerge:
-            bamFilesList=glob.glob(os.path.join(self.baseDir,'*_map.bam'))
-            bamout=os.path.join(self.baseDir,'merged.map.bam')
+            bamFilesList=glob.glob(os.path.join(self.previousStageDir,'*_map.bam'))
+            bamout=os.path.join(self.stageDir,'merged.map.bam')
+            deduped=os.path.join(self.stageDir,'merged.map.deduped.bam')
         else:
-            bamFilesList=glob.glob(os.path.join(self.baseDir,'*_remap.bam'))
-            bamout=os.path.join(self.baseDir,'merged.remap.bam')
-            
+            bamFilesList=glob.glob(os.path.join(self.previousStageDir,'*_remap.bam'))
+            bamout=os.path.join(self.stageDir,'merged.remap.bam')
+            deduped=os.path.join(self.stageDir,'merged.remap.deduped.bam')
+        #set some paths
         bamFiles=" ".join(bamFilesList)
+        metrics=os.path.join(self.stageDir,'dedupmetrics.txt')
+        pair1=os.path.join(*[self.MyProtocol.outDir, 'setup', 'pair1.deduped.fq'])
+        pair2=os.path.join(*[self.MyProtocol.outDir, 'setup', 'pair2.deduped.fq'])
+        outDir=os.path.join(*[self.MyProtocol.outDir, 'setup'])
+        setupScript=os.path.join(self.MyProtocol.scriptBase, \
+                                     'ECsetup.py')
+
         #if we're running only one job, there's nothing to merge:
         if len(bamFilesList)==1:
             #symlink "merged" bam to the existing one:
             os.symlink(bamFilesList[0], bamout)
-            cmdTemplate=string.Template('\n${samtools} index ${bamout};\n')
-        else:
-            cmdTemplate=string.Template('${samtools} merge -@ ${threads}'\
-                                        '${bamout} ${bamFiles};'\
-                                        '\n${samtools} index ${bamout};\n')
+            # if self.MyProtocol.deduplicate and iteration==1:
+            if self.MyProtocol.deduplicate:
+                #if we're going to dedup, lets also extract deduped reads for  
+                #the following iterations, so we don't need to compute them
+                cmdTemplate=string.Template('${java} -jar ${picard} MarkDuplicates '\
+                                            'I=${bamout} O=${deduped} M=${metrics} ' \
+                                            'VALIDATION_STRINGENCY=LENIENT '\
+                                            'REMOVE_DUPLICATES=true;\n'\
+                                            '${samtools} index ${deduped};\n')
+                
+                #unfortunately read extraction from deduped bam creates problems
+                #due to unpaired mates, so we'll have to do this every time..
+                
+            else:
+                #just index the merged bam
+                cmdTemplate=string.Template('\n${samtools} index ${bamout};\n')
+                
+        elif len(bamFilesList)>=1:
+            if self.MyProtocol.deduplicate and iteration==1:
+                cmdTemplate=string.Template('${samtools} merge -@ ${threads} '\
+                                            '${bamout} ${bamFiles};\n'\
+                                            '${java} -jar ${picard} MarkDuplicates '\
+                                            'I=${bamout} O=${deduped} M=${metrics} ' \
+                                            'REMOVE_DUPLICATES=true;\n'\
+                                            '${samtools} index ${deduped};\n')
+
+            else:
+                cmdTemplate=string.Template('${samtools} merge -@ ${threads} '\
+                                            '${bamout} ${bamFiles};'\
+                                            '\n${samtools} index ${bamout};\n')
+            
         cmd=cmdTemplate.substitute({'samtools': self.MyProtocol.samtools,\
-                        'bamFiles': bamFiles,\
-                        'bamout':   bamout,\
-                        'threads':  self.MyProtocol.nThreads})
+                                    'bamFiles': bamFiles,\
+                                    'bamout':   bamout,\
+                                    'deduped':  deduped,\
+                                    'threads':  self.MyProtocol.nThreads,\
+                                    'java':     self.MyProtocol.java,\
+                                    'picard':   self.MyProtocol.picardtools,\
+                                    'metrics':  metrics,\
+                                    'pair1':    pair1,\
+                                    'pair2':    pair2,\
+                                    'ECSetupPath':setupScript,\
+                                    'outDir':   outDir,\
+                                    'nPairs':   self.MyProtocol.nPairs,\
+                                    'reference':self.MyProtocol.reference})
         
         if piped:
             return cmd, None
         
         j='remerge' if remerge else 'merge'
-        stdout=os.path.join(self.baseDir, j+'.out')
-        stderr=os.path.join(self.baseDir, j+'err')
+        stdout=os.path.join(self.stageDir, j+'.out')
+        stderr=os.path.join(self.stageDir, j+'err')
         retCmd.append(Command(cmd, j, stdout, stderr))
         
-        return retCmd, self.baseDir
+        return retCmd, self.stageDir
     
     def prep_varcall(self, iteration, piped=False):
         '''
         run realignerTargetcreator and indelRealigner on merged bam file
         '''
         retCmd=list()
-        reference=os.path.join(self.baseDir,'reference.fa')
-        inputBam=os.path.join(self.baseDir,'merged.map.bam')
-        outputRTC=os.path.join(self.baseDir,'realingerTargetCreator.intervals')
-        realignedBam=os.path.join(self.baseDir, 'merged.map.indelrealigned.bam')
+        reference=os.path.join(self.indexDir,'reference.fa')
+        outputRTC=os.path.join(self.stageDir,'realingerTargetCreator.intervals')
+        realignedBam=os.path.join(self.stageDir, 'merged.map.indelrealigned.bam')
+        if self.MyProtocol.deduplicate:
+            inputBam=os.path.join(self.previousStageDir,'merged.map.deduped.bam')
+        else:
+            inputBam=os.path.join(self.previousStageDir,'merged.map.deduped.bam')
+        
+        
         cmdTemplate=string.Template('${java} -jar ${gatk} -nt ${threads}'\
                                     ' -T RealignerTargetCreator -R ${reference}'\
                                     ' -I ${inputBam} -o ${outputRTC};\n'\
@@ -452,19 +555,19 @@ class StageDriver(object):
             return cmd, None
         
         j='prep_varcall'
-        stdout=os.path.join(self.baseDir, j+'.out')
-        stderr=os.path.join(self.baseDir, j+'.err')
+        stdout=os.path.join(self.stageDir, j+'.out')
+        stderr=os.path.join(self.stageDir, j+'.err')
         retCmd.append(Command(cmd, j, stdout, stderr))
         
-        return retCmd, self.baseDir
+        return retCmd, self.stageDir
     
     def varcall(self, iteration):
         '''
         run variant calls
         '''
         retCmd=list()
-        reference=os.path.join(self.baseDir,'reference.fa')
-        inputBam=os.path.join(self.baseDir, 'merged.map.indelrealigned.bam')
+        reference=os.path.join(self.indexDir,'reference.fa')
+        inputBam=os.path.join(self.previousStageDir, 'merged.map.indelrealigned.bam')
         nChunks=self.MyProtocol.nJobs
         
         #read in reference.fa.fai to get length index
@@ -485,11 +588,11 @@ class StageDriver(object):
                                     '-o ${varcalls};\n')
         
         for chunk in chunks:
-            intervalFile=os.path.join(self.baseDir, 'intervals.{}.list'.format(n))
+            intervalFile=os.path.join(self.previousStageDir, 'intervals.{}.list'.format(n))
             with open(intervalFile,'w') as intervals:
                 print("\n".join(x[0] for x in chunk), file=intervals)
                 
-            varcalls=os.path.join(self.baseDir, 'varcalls.raw.{}.vcf'.format(n))
+            varcalls=os.path.join(self.stageDir, 'varcalls.raw.{}.vcf'.format(n))
             cmd=cmdTemplate.substitute({'java':         self.MyProtocol.java,\
                                         'gatk':         self.MyProtocol.gatk,\
                                         'threads':      self.MyProtocol.nThreads,\
@@ -501,14 +604,14 @@ class StageDriver(object):
             
             j='varcall'
             jobname=j
-            stdout=os.path.join(self.baseDir, j+'.out')
-            stderr=os.path.join(self.baseDir, j+'.err')
+            stdout=os.path.join(self.stageDir, j+'.out')
+            stderr=os.path.join(self.stageDir, j+'.err')
             logging.debug('Executing {}'.format(cmd))
             Command(cmd, jobname, stdout, stderr)
             retCmd.append(Command(cmd, j, stdout, stderr))
             n+=1
         
-        return retCmd, self.baseDir
+        return retCmd, self.stageDir
     
     def varintegration(self, iteration, piped=False):
         """
@@ -518,28 +621,28 @@ class StageDriver(object):
         
         integrateScript=os.path.join(self.MyProtocol.scriptBase, \
                                      'ECintegrateVars.py')
-        vcfs=",".join(glob.glob(os.path.join(self.baseDir, '*.vcf')))
+        vcfs=",".join(glob.glob(os.path.join(self.previousStageDir, '*.vcf')))
         cmdTemplate=string.Template('${python3} ${integrateScript} ${reference}'\
                                     ' ${vcfs} ${alignments} ${outFolder};\n')
-        reference=os.path.join(self.baseDir,'reference.fa')
-        bam=os.path.join(self.baseDir,'merged.map.indelrealigned.bam')
+        reference=os.path.join(self.indexDir,'reference.fa')
+        bam=os.path.join(*[self.baseDir,'prepvarcall',\
+                           'merged.map.indelrealigned.bam'])
         
         cmd=cmdTemplate.substitute({'python3':      self.MyProtocol.python3,\
                                     'integrateScript':  integrateScript,\
                                     'reference':        reference,\
                                     'vcfs':             vcfs,\
                                     'alignments':       bam,\
-                                    'outFolder':        self.baseDir})
+                                    'outFolder':        self.stageDir})
         
         if piped:
             return cmd, None
-        
         j='var_integration'
-        stdout=os.path.join(self.baseDir, j+'.out')
-        stderr=os.path.join(self.baseDir, j+'.err')
+        stdout=os.path.join(self.stageDir, j+'.out')
+        stderr=os.path.join(self.stageDir, j+'.err')
         retCmd.append(Command(cmd, j, stdout, stderr))
         
-        return retCmd, self.baseDir
+        return retCmd, self.stageDir
     
     def correction(self, iteration, piped=False):
         """
@@ -555,10 +658,17 @@ class StageDriver(object):
         
         sanitizeScript=os.path.join(self.MyProtocol.scriptBase,\
                                     'ECsanitize.py')
-        integratedVars=os.path.join(self.baseDir, \
-                                    'reference.varcall.integrated.fa')
-        bam=os.path.join(self.baseDir, 'merged.remap.bam')
-        varTrack=os.path.join(self.baseDir, 'varTrack.tsv')
+        integratedVars=os.path.join(*[self.baseDir, \
+                                      'varintegration',\
+                                    'reference.varcall.integrated.fa'])
+        if self.MyProtocol.deduplicate:
+            bam=os.path.join(self.previousStageDir, 'merged.remap.deduped.bam')
+        else:
+            bam=os.path.join(self.previousStageDir, 'merged.remap.bam')
+
+        varTrack=os.path.join(self.baseDir, \
+                              'varintegration',\
+                              'varTrack.tsv')
 
         cmdTemplate=string.Template('${python3} ${sanitizeScript} ${integratedVars}'\
                                     ' ${alignments} ${varTrack} ${outFolder};\n')
@@ -568,16 +678,16 @@ class StageDriver(object):
                                     'integratedVars':   integratedVars,\
                                     'alignments':       bam,\
                                     'varTrack':         varTrack,\
-                                    'outFolder':        self.baseDir})
+                                    'outFolder':        self.stageDir})
         if piped:
             return cmd, None
         
         j='sanitizing'
-        stdout=os.path.join(self.baseDir, j+'.out')
-        stderr=os.path.join(self.baseDir, j+'.err')
+        stdout=os.path.join(self.stageDir, j+'.out')
+        stderr=os.path.join(self.stageDir, j+'.err')
         retCmd.append(Command(cmd, j, stdout, stderr))
         
-        return retCmd, self.baseDir
+        return retCmd, self.stageDir
 
     
     ########################
@@ -585,6 +695,9 @@ class StageDriver(object):
     ########################
     
     def selfCall(self, stage, piped=False):
+        """
+        create cmd to call this script
+        """
         cmdTemplate=string.Template('${python3} ${ourName} ${stage} ${protocol};\n')
         cmd=cmdTemplate.substitute({'python3':      self.MyProtocol.python3,\
                                     'ourName':  self.name,\
@@ -636,6 +749,7 @@ if __name__ == '__main__':
         #sys.exit([0])
     except:
         logging.error("Oh well..something went terribly wrong along the way..\n"\
-                      "\t\t\t\tDid you run the previous stage yet?"
-                      "\n\n\n", exc_info=True)
+                      "\t\t\t\tDid you run the previous stage yet?\n"
+                      "\t\t\t\tIn any case, here's the Traceback:"
+                      "\n\n\n{}\n\n\n".format('#'*80), exc_info=True)
         

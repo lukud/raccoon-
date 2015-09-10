@@ -6,7 +6,6 @@ import os
 import re
 import logging
 import gzip
-from ECUtils import load_fastq
 
 class Setup(object):
     '''
@@ -37,9 +36,7 @@ class Setup(object):
             os.symlink(self.readFile1, simLinkP1)
             os.symlink(self.readFile2, simLinkP2)
         else:
-            self.chunkReads(self.readFile1, 1)
-            if self.readFile2 is not None:
-                self.chunkReads(self.readFile2, 2)
+            self.chunkReads()
     
     def check_fasta_header(self):
         
@@ -56,34 +53,49 @@ class Setup(object):
                                          "Conflicting header: {} ".format(line))
                         sys.exit(1)
         
-    def chunkReads(self, readfile, pair):
-        '''
-        Method to divide the reads into equaly sized chunks
-        for scattered mapping.
-        '''
-        #I should be counting readpairs somwhere here
-        readsPerChunk=(self.nPairs//self.nChunks)+1
-        print('{} divided by {} is {}'.format(self.nPairs,self.nChunks, readsPerChunk))
-        logging.info('splitting read files into chunks of {} reads'.format(readsPerChunk))
         
-        chunk=0
-        nReads=0
-        readTracker=0
-        chunkFile=None
-        prefix='p1' if pair==1 else 'p2'
-        for read in load_fastq(readfile):
-            if readTracker%readsPerChunk==0:
-                readTracker=0
-                if chunkFile:
-                    chunkFile.close()
-                chunkFileName='{}.{}.fq'.format(nReads, prefix)
-                chunkFile=open(os.path.join(self.basedir,chunkFileName), 'w')
-            chunkFile.write('\n'.join(read)+"\n")
-            nReads+=1
-            readTracker+=1
-        chunkFile.close()
-                               
-                    
+        
+    def chunkReads(self):
+        """
+        super crude function to chunk reads. No fastq validation whatsoever
+        is done, fastq is assumed to be 4 lined
+        """
+        def splitFile(readsPerChunk, fileHandle, basedir, prefix, gz):
+            lineCount=0
+            dest=None
+            for line in fileHandle:
+                if lineCount % (readsPerChunk*4)==0:
+                    if dest:
+                        dest.close()
+                    outFileName='{}.{}.fq'.format(lineCount, prefix)
+                    wmode="wb" if gz else "w"
+                    dest=open(os.path.join(self.basedir, outFileName), wmode)
+                dest.write(line)
+                lineCount+=1
+        gz=False
+        pairsPerChunk=(self.nPairs//self.nChunks)+1
+        logging.info('splitting readlines in chunks of {} reads'.format(pairsPerChunk))
+        
+        if self.readFile1.endswith('gz')\
+        or self.readFile1.endswith('gzip'):
+            logging.info('Readfiles seem to be gziped')
+            p1=gzip.open(self.readFile1, 'rb')
+            if self.readFile2 is not None:
+                p2=gzip.open(self.readFile2, 'rb')
+            gz=True
+        else:
+            p1=open(self.readFile1)
+            if self.readFile2 is not None:
+                p2=open(self.readFile2)
+        
+        splitFile(pairsPerChunk, p1, self.basedir, 'p1', gz)
+        if self.readFile2 is not None:
+            splitFile(pairsPerChunk, p2, self.basedir, 'p2', gz)
+        
+        p1.close()
+        if self.readFile2 is not None:
+            p2.close()
+        
 if __name__ == '__main__':
     
     logFormat = "%(asctime)s [%(levelname)s] %(message)s"
