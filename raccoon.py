@@ -483,7 +483,7 @@ class StageDriver(object):
                 cmdTemplate=string.Template('\n${samtools} index ${bamout};\n')
                 
         elif len(bamFilesList)>=1:
-            if self.MyProtocol.deduplicate and iteration==1:
+            if self.MyProtocol.deduplicate:
                 cmdTemplate=string.Template('${samtools} merge -@ ${threads} '\
                                             '${bamout} ${bamFiles};\n'\
                                             '${java} -jar ${picard} MarkDuplicates '\
