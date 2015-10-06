@@ -28,8 +28,9 @@ class SNVFilter(vcf.filters.Base):
         try:
             if Record.INFO['QD'] < self.MIN_QD:  return False
         except:
+            logging.warning('Missing QD field!')
             return False
-        
+
         return True
     
 class IndelFilter(vcf.filters.Base):
@@ -41,7 +42,7 @@ class IndelFilter(vcf.filters.Base):
     '''
     MIN_QUAL=30     #minimum variant qual (phred)
     MIN_QD=2        #minimum quality by depth
-    MAXLEN=6
+    #MAXLEN=6       
     
     def __init__(self):
         pass
@@ -52,12 +53,13 @@ class IndelFilter(vcf.filters.Base):
         try:
             if Record.INFO['QD'] < self.MIN_QD:  return False
         except:
+            logging.warning('Missing QD field!')
             return False
         # add 1 to maxlen as the representaiton includes
         # 1 base upstream by vcf specification
-        if len(Record.REF) > self.MAXLEN+1:    return False #should this really
-        for i in Record.ALT:                                #be that absolute?
-            if len(i.sequence)>self.MAXLEN+1:  return False        
+     #   if len(Record.REF) > self.MAXLEN+1:    return False #should this really
+     #   for i in Record.ALT:                                #be that absolute?
+     #       if len(i.sequence)>self.MAXLEN+1:  return False        
         
         return True
     

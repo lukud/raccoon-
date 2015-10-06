@@ -141,6 +141,7 @@ class Protocol(object):
         self.picardtools='picard.jar'
         self.gatk='gatk'
         self.pyhton3='python3'
+        self.tmpdir='$TMPDIR'
         self.java='java'
         #reset defaults if paths were defined
         if paths is not None:
@@ -156,6 +157,13 @@ class Protocol(object):
                 self.java=paths.find('java').text
             if paths.find('python3') is not None:
                 self.python3=paths.find('python3').text
+            if paths.find('tmpdir') is not None:
+                self.tmpdir=paths.find('tmpdir').text
+
+        #set javas tmpdir directly in the attribute so, we don't have to
+        #do it each time we construct the command
+        self.java+=' -Djava.io.tmpdir={}'.format(self.tmpdir)
+
 
 class StageDriver(object):
     
