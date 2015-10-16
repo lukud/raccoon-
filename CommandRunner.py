@@ -80,6 +80,10 @@ def exe(cmd, timeout=-1):
         signal.alarm(int(timeout*60))  
     try:
         stdoutVal, stderrVal =  proc.communicate()
+        print(cmd)
+        logging.debug("Executing {}".format(cmd))
+        logging.debug("STDERR:\n{}".format(stderrVal))
+        logging.debug("STDOUT:\n{}".format(stdoutVal))
         signal.alarm(0)  # reset the alarm
     except Alarm:
         logging.error(("Command was taking too long. "
