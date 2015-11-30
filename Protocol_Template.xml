@@ -12,6 +12,8 @@
         <nJobs>NUMBER OF JOBS</nJobs>
         <template>your-cluster-scheduler -n ${JOBNAME} -standard_error ${STDERR} -standard_output ${STDOUT} -command "${CMD}"</template>
     </cluster>
+    <minIndelQ>40</minIndelQ>
+    <minSNVQ>40</minSNVQ>
     <paths>
         <scripts>/racoon/basedir</scripts>
         <bwa>/path/to/bwa</bwa>
