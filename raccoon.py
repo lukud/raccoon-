@@ -135,6 +135,20 @@ class Protocol(object):
         else:
             logging.critical("You need to provide the 'scripts' tag within the"\
                              " 'paths' tag in the protocol!")
+        
+        #Get minimum qual valiues for indelx and snv
+        minSNVQ=p.find('minSNVQ')
+        if minSNVQ is not None:
+            self.minSNVQ=int(minSNVQ.text)
+        else:
+            self.minSNVQ=30
+            
+        minIndelQ=p.find('minIndelQ')
+        if minIndelQ is not None:
+            self.minIndelQ=int(minIndelQ.text)
+        else:
+            self.minIndelQ=30
+        
         #set default paths
         self.bwa='bwa'
         self.samtools='samtools'
@@ -631,7 +645,8 @@ class StageDriver(object):
                                      'ECintegrateVars.py')
         vcfs=",".join(glob.glob(os.path.join(self.previousStageDir, '*.vcf')))
         cmdTemplate=string.Template('${python3} ${integrateScript} ${reference}'\
-                                    ' ${vcfs} ${alignments} ${outFolder};\n')
+                                    ' ${vcfs} ${alignments} ${outFolder} '\
+                                    '${minSNVQ} ${minIndelQ};\n')
         reference=os.path.join(self.indexDir,'reference.fa')
         bam=os.path.join(*[self.baseDir,'prepvarcall',\
                            'merged.map.indelrealigned.bam'])
@@ -641,7 +656,9 @@ class StageDriver(object):
                                     'reference':        reference,\
                                     'vcfs':             vcfs,\
                                     'alignments':       bam,\
-                                    'outFolder':        self.stageDir})
+                                    'outFolder':        self.stageDir,\
+                                    'minSNVQ':          self.MyProtocol.minSNVQ,\
+                                    'minIndelQ':        self.MyProtocol.minIndelQ})
         
         if piped:
             return cmd, None

@@ -18,12 +18,12 @@ class SNVFilter(vcf.filters.Base):
     filters simply return true for pass and false for fail
 
     '''
-    MIN_QUAL=30     #minimum variant qual (phred)
+    #MIN_QUAL=30     #minimum variant qual (phred)
     MIN_QD=2        #minimum quality by depth
     def __init__(self):
         pass
-    def __call__(self, Record):
-        if Record.QUAL < self.MIN_QUAL:  return False
+    def __call__(self, Record, qualCutoff):
+        if Record.QUAL < qualCutoff:  return False
         #some records have missing QD values for obscure reasons, skip those
         try:
             if Record.INFO['QD'] < self.MIN_QD:  return False
@@ -40,15 +40,15 @@ class IndelFilter(vcf.filters.Base):
     filters simply return true for pass and false for fail
 
     '''
-    MIN_QUAL=30     #minimum variant qual (phred)
+    #MIN_QUAL=30     #minimum variant qual (phred)
     MIN_QD=2        #minimum quality by depth
     #MAXLEN=6       
     
     def __init__(self):
         pass
     
-    def __call__(self, Record):
-        if Record.QUAL < self.MIN_QUAL: return False
+    def __call__(self, Record, qualCutoff):
+        if Record.QUAL < qualCutoff: return False
         #some records have missing QD values for obscure reasons, skip those
         try:
             if Record.INFO['QD'] < self.MIN_QD:  return False
@@ -66,11 +66,16 @@ class IndelFilter(vcf.filters.Base):
     
 class IntegrateTrackVariants(object):
     
-    def __init__(self, reference, variantFiles, mappings, outPrefix):
+    def __init__(self, reference, variantFiles, mappings,\
+                 outPrefix, minSNVqual, minIndelQual):
+        
         self.reference=     reference
         self.variantFiles=  variantFiles
         self.mappings=      pysam.AlignmentFile(mappings, 'rb')
         self.outPrefix=     outPrefix
+        self.minSNVqual=    minSNVqual
+        self.minIndelQual=  minIndelQual
+        
 
         self.sequenceDict={}
         self.outTracker=set()
@@ -157,10 +162,10 @@ class IntegrateTrackVariants(object):
             if  re.match(hetRef, genotype):
                 continue
             #FILTER EXPRESSIONS FOR SNV
-            if Record.is_snp and SNVFilterPass(Record):
+            if Record.is_snp and SNVFilterPass(Record, self.minSNVqual):
                     integratedSNV+=1
             #FILTER EXPRESSION FOR INDELS
-            elif Record.is_indel and IndelFilterPass(Record):
+            elif Record.is_indel and IndelFilterPass(Record, self.minIndelQual):
                     integratedIndel+=1
             #skip variants that don't pass the filter
             else:
@@ -246,9 +251,11 @@ if __name__ == '__main__':
     parser.add_argument('variants', type=str)
     parser.add_argument('alignments', type=str)
     parser.add_argument('outPrefix', type=str)
+    parser.add_argument('minSNVqual', type=int)
+    parser.add_argument('minIndelQual', type=int)
     parser.add_argument('-v', '--verbosity', type=str, \
                         choices=['info','WARNING','ERROR', 'DEBUG'], default='info')
     args=parser.parse_args()
     logging.basicConfig( stream=sys.stderr, format=logFormat, level=args.verbosity)
     i=IntegrateTrackVariants(args.reference, args.variants, args.alignments,\
-                             args.outPrefix)
+                             args.outPrefix, args.minSNVqual, args.minIndelQual)
